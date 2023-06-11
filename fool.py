@@ -2,6 +2,10 @@ import random
 import numpy as np
 
 class Player:
+    """
+    An abstraction for a bot/real player. It keeps its hand as a numpy array of integers. It's main methods are attack and defend. Other methonds
+    are for observing the state of the game.
+    """
     def __init__(self, name='player'):
         self.trump = None
         self.nPlayers = None
@@ -60,6 +64,12 @@ class Player:
 
 
 class Deck:
+    """
+    Deck contains order of cards as integers in a numpy array. 
+    
+    Cards are integers from 0 to 35. Each suite (hearts, spades, etc) starts from
+    a multiple of 9. So 0-8 is one suite, 9-17 is the next.
+    """
     def __init__(self):
         self.trumpcard = None
         self.order = np.linspace(0, 35, 36, dtype='int')
@@ -80,6 +90,11 @@ class Deck:
 
 
 def movesFirst(order: np.array, trump: int, trumpcard: int, numpl: int) -> int:
+    """
+    This function decides who moves first in a game.
+    If the trumpcard is 10 or lower, then the player with the highest card of trump suite plays first. If the trumpcard is higher than 10,
+    then the person with the lowest card of trump suite plays first.
+    """
     fmovers = list()
     if trumpcard % 9 > 4:
         direction = 1
@@ -107,12 +122,16 @@ def movesFirst(order: np.array, trump: int, trumpcard: int, numpl: int) -> int:
 
 
 def addLeft(left: list, player):
+    """Adds a player to the list of left player if necessary"""
     if np.size(player.hand) == 0 and player not in left:
         left.append(player)
     return left
 
 
 class Chain:
+    """
+    Keeps order of players and decides who must currently attack.
+    """
     def __init__(self, players, attacker_n):
         self.players = players
         self.attacker = players[attacker_n]
@@ -135,6 +154,7 @@ class Chain:
 
 
 def legitAttack(hand, board, valuesOnBoard, defCapability):
+    """Creates a list of feasible moves given current state of the game for attacker"""
     if len(board) == 0: return list(hand)
     if len(board) >= 6 or defCapability == 0: return ['pass']
     moves = [card for card in hand if card % 9 in valuesOnBoard]
@@ -157,6 +177,7 @@ def applyAttack(move, attacker, board, valuesOnBoard, moveState, cardsOnBoard):
 
 
 def legitDefense(hand, board, trump):
+    """Creates a list of feasible moves given current state of the game for defender"""
     color, value = divmod(board['toBeat'], 9)
     if color == trump: return [card for card in hand if card // 9 == trump and card % 9 > value] + ['take']
     return [card for card in hand if card // 9 == trump or (card // 9 == color and card % 9 > value)] + ['take']
@@ -191,6 +212,10 @@ class Game:
         self.fixedTrump = trump
 
     def prepare(self):
+        """
+        Prepares the game for start: shuffles a deck, decides who must attack first, creates
+        a chain and tells the players basic information about current game.
+        """
         self.whoAttack = -1
         fixedTrumpCondition = True #mechanism for randomly shuffling cards until trump is specified
         while self.whoAttack == -1 or fixedTrumpCondition:
@@ -209,6 +234,7 @@ class Game:
         self.attackers, self.defender = self.queuer.queue()
 
     def verbose(self, isAttack, data):
+        """Used for debugging"""
         print('|', '-' * 100, sep='')
         if isAttack:
             print(f'|  {vision(self.attacker)} attacks')
@@ -221,11 +247,16 @@ class Game:
         if input('| Continue manual? Enter/n?') == 'n': self.manual = False
 
     def assertion_text(self, move, moves):
+        """Used for debugging"""
         return str(f'{vision(self.attacker)}' +
                    f'{self.moveN=}\n{vision(self.board)=}' +
                    f'{vision(move)=}, {vision(moves)=}, {self.defender=}')
 
     def move(self):
+        """
+        Main component of the code. It cycles through players in the current move. It manipulates everything happening on board
+        and keeps track of everything else, also telling players of what's happening.
+        """
         continuePlaying, left = True, list()
         self.board, self.valuesOnBoard, self.moveState, self.cardsOnBoard = dict(), set(), {'take': False,
                                                                                             'pass': False}, []
@@ -272,6 +303,7 @@ class Game:
             {'left': left, 'moveN': self.moveN, 'isDeckEmpty': np.size(self.deck.order) == 0})
 
     def play(self):
+        """Conveniently launches everything in the game, so that we don't have to do it manually"""
         self.prepare()
         self.deckHistory.append(self.deck.order)
         while not self.stop:
@@ -378,13 +410,17 @@ class ScorePlayer(Player):
         start = self.trump * 9
         for card in range(start, start + 9):
             self.scores[card] += 9
-        self.scores['take'] = 666
+        self.scores['take'] = 666 #so that players never pick these moves
         self.scores['pass'] = 666
 
     def score(self, move):
         return self.scores[move]
 
 class PowerPlayer(ScorePlayer):
+    """
+    Knows power of any set of cards. Power is defined as sum of power of individual cards.
+    Cards of non-trump suite have powers (scores) 0-8 and trump cards have scores 9-13 in order of 'strength'
+    """
     def power(self, cards):
         return sum([self.score(card) for card in cards])
 
@@ -393,6 +429,7 @@ class PowerPlayer(ScorePlayer):
 
 
 class Naive1(ScorePlayer):
+    """Always picks move with the smallest score"""
     def attack(self, legalMoves):
         moves = legalMoves
         scores = [self.score(move) for move in moves]
@@ -407,6 +444,7 @@ class Naive1(ScorePlayer):
     
 
 class Naive2(Naive1):
+    """Picks move with the smallest score, but does not play cards of trump suite until 'cutoff' number of moves have passed"""
     def __init__(self, name: str, cutoff: int):
         super().__init__('name')
         self.cutoff = cutoff
