@@ -299,8 +299,7 @@ class Game:
         self.left.extend(left)
         self.attackers, self.defender = self.queuer.cycle(left, self.moveState['take'])
         if len(self.left) >= self.nPlayers - 1: self.stop = True
-        for p in self.players: p. (
-            {'left': left, 'moveN': self.moveN, 'isDeckEmpty': np.size(self.deck.order) == 0})
+        for p in self.players: p.inputMoveInfo({'left': left, 'moveN': self.moveN, 'isDeckEmpty': np.size(self.deck.order) == 0})
 
     def play(self):
         """Conveniently launches everything in the game, so that we don't have to do it manually"""
